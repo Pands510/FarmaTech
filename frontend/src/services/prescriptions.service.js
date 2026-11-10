@@ -1,6 +1,7 @@
+
 import api from './api';
 
-export const prescriptionsService = {
+const prescriptionsService = {
   async getPending() {
     const response = await api.get('/receitas/pendentes');
     return response.data;
@@ -21,13 +22,10 @@ export const prescriptionsService = {
     return response.data;
   },
 
-  async approvePrescription(id) {
-    const response = await api.post(`/receitas/${id}/aprovar`);
-    return response.data;
-  },
-
   async searchDoctors(crm, uf) {
-    const response = await api.get('/medicos/busca', { params: { crm, uf } });
+    const response = await api.get('/medicos/busca', {
+      params: { crm, uf }
+    });
     return response.data;
   },
 
@@ -36,3 +34,5 @@ export const prescriptionsService = {
     return response.data;
   }
 };
+
+export default prescriptionsService;

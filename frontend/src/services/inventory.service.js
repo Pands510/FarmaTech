@@ -1,6 +1,7 @@
+
 import api from './api';
 
-export const inventoryService = {
+const inventoryService = {
   async listProducts(filters = {}) {
     const response = await api.get('/produtos', { params: filters });
     return response.data;
@@ -37,7 +38,6 @@ export const inventoryService = {
   },
 
   async manualDischarge(dischargeData) {
-    // dischargeData: { id_produto, id_lote, quantidade, motivo, observacao }
     const response = await api.post('/estoque/baixa-manual', dischargeData);
     return response.data;
   },
@@ -52,3 +52,5 @@ export const inventoryService = {
     return response.data;
   }
 };
+
+export default inventoryService;

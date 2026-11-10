@@ -1,24 +1,25 @@
+
 const dashboardRepository = require('./dashboard.repository');
 
 class DashboardService {
   async getKpis() {
-    return await dashboardRepository.getDailyKpis();
+    return dashboardRepository.getDailyKpis();
   }
 
   async getLowStockAlerts() {
-    return await dashboardRepository.getLowStockAlerts();
+    return dashboardRepository.getLowStockAlerts();
   }
 
   async getExpiringProducts() {
-    return await dashboardRepository.getExpiringProducts();
+    return dashboardRepository.getExpiringProducts();
   }
 
   async getWeeklySales() {
-    return await dashboardRepository.getWeeklySalesChart();
+    return dashboardRepository.getWeeklySalesChart();
   }
 
   async getSalesByCategory() {
-    return await dashboardRepository.getSalesByCategoryChart();
+    return dashboardRepository.getSalesByCategoryChart();
   }
 }
 

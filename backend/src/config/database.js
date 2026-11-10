@@ -1,5 +1,28 @@
+
 const mysql = require('mysql2/promise');
 require('dotenv').config();
+
+const isProduction = process.env.NODE_ENV === 'production';
+
+const requiredVariables = [
+  'DB_HOST',
+  'DB_USER',
+  'DB_NAME'
+];
+
+if (isProduction) {
+  requiredVariables.push('DB_PASSWORD');
+}
+
+const missingVariables = requiredVariables.filter(
+  (variable) => !process.env[variable]
+);
+
+if (missingVariables.length > 0) {
+  throw new Error(
+    `[Database] Variáveis de ambiente ausentes: ${missingVariables.join(', ')}`
+  );
+}
 
 const pool = mysql.createPool({
   host: process.env.DB_HOST || 'localhost',
@@ -7,23 +30,39 @@ const pool = mysql.createPool({
   user: process.env.DB_USER || 'root',
   password: process.env.DB_PASSWORD || '',
   database: process.env.DB_NAME || 'erp_farmacia',
+
   waitForConnections: true,
   connectionLimit: 15,
   queueLimit: 0,
-  dateStrings: true, // Garante que datas retornem em formato string ISO/SQL sem distorção de fuso
-  decimalNumbers: true // Converte colunas DECIMAL do MySQL para Number do JS
+
+  dateStrings: true,
+  decimalNumbers: true
 });
 
 async function testConnection() {
+  let connection;
+
   try {
-    const connection = await pool.getConnection();
-    console.log(`[Database] Conexão com MySQL estabelecida com sucesso na base '${process.env.DB_NAME || 'erp_farmacia'}'!`);
-    connection.release();
+    connection = await pool.getConnection();
+
+    await connection.query('SELECT 1');
+
+    console.log(
+      `[Database] Conexão com MySQL estabelecida com sucesso na base '${process.env.DB_NAME || 'erp_farmacia'}'!`
+    );
+
     return true;
   } catch (error) {
-    console.error('[Database] ATENÇÃO: Falha ao conectar ao MySQL:', error.message);
-    console.error('[Database] Certifique-se de que o serviço MySQL está rodando e o script banco_farmatech_completo.sql foi importado.');
-    return false;
+    console.error(
+      '[Database] Falha ao conectar ao MySQL:',
+      error.message
+    );
+
+    throw error;
+  } finally {
+    if (connection) {
+      connection.release();
+    }
   }
 }
 

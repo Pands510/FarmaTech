@@ -1,14 +1,31 @@
+
 const crypto = require('crypto');
 const jwt = require('jsonwebtoken');
 const authRepository = require('./auth.repository');
 
 class AuthService {
-  /**
-   * Mapeamento de permissões do sistema conforme o Cargo / Perfil RBAC
-   */
-  getPermissionsForRole(cargo, perfil) {
-    const role = (cargo || perfil || '').toUpperCase();
 
+  getJwtSecret() {
+    const secret = process.env.JWT_SECRET;
+
+    if (!secret || secret.length < 32) {
+      const err = new Error(
+        'JWT_SECRET ausente ou insuficiente. Configure uma chave segura.'
+      );
+
+      err.statusCode = 500;
+      err.errorCode = 'AUTH_CONFIGURATION_ERROR';
+
+      throw err;
+    }
+
+    return secret;
+  }
+
+
+  getPermissionsForRole(cargo, perfil) {
+    const role = (perfil || cargo || '').trim().toUpperCase();
+  
     const fullPermissions = [
       'DASHBOARD_FULL',
       'PDV_TOTAL',
@@ -19,11 +36,11 @@ class AuthService {
       'COMPRAS_TOTAL',
       'ADMIN_CONFIG'
     ];
-
-    if (role === 'ADMINISTRADOR' || role === 'CEO' || role === 'DBA') {
-      return fullPermissions;
+  
+    if (['ADMINISTRADOR', 'CEO', 'DBA'].includes(role)) {
+      return [...fullPermissions];
     }
-
+  
     if (role === 'GERENTE') {
       return [
         'DASHBOARD_FULL',
@@ -35,7 +52,7 @@ class AuthService {
         'COMPRAS_TOTAL'
       ];
     }
-
+  
     if (role === 'FARMACEUTICO') {
       return [
         'RECEITAS_TOTAL',
@@ -44,66 +61,100 @@ class AuthService {
         'DASHBOARD_CONSULTA'
       ];
     }
-
+  
     if (role === 'ATENDENTE') {
       return [
         'PDV_TOTAL',
         'ESTOQUE_CONSULTA'
       ];
     }
-
+  
     if (role === 'CAIXA') {
       return [
         'CAIXA_TOTAL',
         'PDV_TOTAL'
       ];
     }
-
+  
     if (role === 'ESTOQUISTA') {
       return [
         'ESTOQUE_GERAL',
         'COMPRAS_TOTAL'
       ];
     }
-
+  
     return ['PDV_TOTAL'];
   }
 
+
   async login(matricula, senha) {
-    if (!matricula || !senha) {
-      const err = new Error('Matrícula e senha são obrigatórios.');
+    if (
+      typeof matricula !== 'string' ||
+      !matricula.trim() ||
+      typeof senha !== 'string' ||
+      !senha
+    ) {
+      const err = new Error(
+        'Matrícula e senha são obrigatórios.'
+      );
+
       err.statusCode = 400;
       err.errorCode = 'VALIDATION_ERROR';
+
       throw err;
     }
 
-    const funcionario = await authRepository.findByMatricula(matricula);
+    const JWT_SECRET = this.getJwtSecret();
+
+    const funcionario = await authRepository.findByMatricula(
+      matricula.trim()
+    );
 
     if (!funcionario) {
-      const err = new Error('Credenciais inválidas: funcionário não encontrado.');
+      const err = new Error('Credenciais inválidas.');
       err.statusCode = 401;
       err.errorCode = 'AUTH_FAILED';
       throw err;
     }
 
     if (funcionario.status_funcionario !== 'ATIVO') {
-      const err = new Error(`Acesso negado: colaborador encontra-se com status '${funcionario.status_funcionario}'.`);
+      const err = new Error('Acesso negado: funcionário inativo.');
       err.statusCode = 403;
       err.errorCode = 'ACCOUNT_INACTIVE';
       throw err;
     }
 
-    // O banco utiliza SHA2(senha, 256) em hex
-    const senhaHash = crypto.createHash('sha256').update(senha).digest('hex');
+    // Compatibilidade temporária com os hashes SHA-256 existentes.
+    const senhaHash = crypto
+      .createHash('sha256')
+      .update(senha, 'utf8')
+      .digest();
 
-    if (senhaHash.toLowerCase() !== funcionario.senha_hash.toLowerCase()) {
-      const err = new Error('Credenciais inválidas: senha incorreta.');
+    const hashBanco = funcionario.senha_hash;
+
+    if (
+      typeof hashBanco !== 'string' ||
+      !/^[a-fA-F0-9]{64}$/.test(hashBanco)
+    ) {
+      const err = new Error('Credenciais inválidas.');
       err.statusCode = 401;
       err.errorCode = 'AUTH_FAILED';
       throw err;
     }
 
-    const permissoes = this.getPermissionsForRole(funcionario.cargo, funcionario.perfil_nome);
+    const hashArmazenado = Buffer.from(hashBanco, 'hex');
+
+    if (!crypto.timingSafeEqual(senhaHash, hashArmazenado)) {
+      const err = new Error('Credenciais inválidas.');
+      err.statusCode = 401;
+      err.errorCode = 'AUTH_FAILED';
+      throw err;
+    }
+
+    const permissoes = this.getPermissionsForRole(
+      funcionario.cargo,
+      funcionario.perfil_nome
+    );
 
     const payload = {
       id_funcionario: funcionario.id_funcionario,
@@ -116,11 +167,16 @@ class AuthService {
 
     const token = jwt.sign(
       payload,
-      process.env.JWT_SECRET || 'farmatech_jwt_secret_token_secure_key_2026_erp',
-      { expiresIn: process.env.JWT_EXPIRES_IN || '8h' }
+      JWT_SECRET,
+      {
+        algorithm: 'HS256',
+        expiresIn: process.env.JWT_EXPIRES_IN || '8h'
+      }
     );
 
-    await authRepository.updateLastAccess(funcionario.id_funcionario);
+    await authRepository.updateLastAccess(
+      funcionario.id_funcionario
+    );
 
     return {
       token,
@@ -136,7 +192,10 @@ class AuthService {
   }
 
   async getProfile(id_funcionario) {
-    const funcionario = await authRepository.findById(id_funcionario);
+    const funcionario = await authRepository.findById(
+      id_funcionario
+    );
+
     if (!funcionario) {
       const err = new Error('Funcionário não localizado.');
       err.statusCode = 404;
@@ -144,7 +203,17 @@ class AuthService {
       throw err;
     }
 
-    const permissoes = this.getPermissionsForRole(funcionario.cargo, funcionario.perfil_nome);
+    if (funcionario.status_funcionario !== 'ATIVO') {
+      const err = new Error('Acesso negado: funcionário inativo.');
+      err.statusCode = 403;
+      err.errorCode = 'ACCOUNT_INACTIVE';
+      throw err;
+    }
+
+    const permissoes = this.getPermissionsForRole(
+      funcionario.cargo,
+      funcionario.perfil_nome
+    );
 
     return {
       id_funcionario: funcionario.id_funcionario,

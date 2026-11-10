@@ -1,13 +1,31 @@
+
 import api from './api';
+
+const TOKEN_KEY = 'farmatech_token';
+const USER_KEY = 'farmatech_user';
 
 export const authService = {
   async login(matricula, senha) {
-    const response = await api.post('/auth/login', { matricula, senha });
-    if (response.data.token) {
-      localStorage.setItem('farmatech_token', response.data.token);
-      localStorage.setItem('farmatech_user', JSON.stringify(response.data.usuario));
+    try {
+      const response = await api.post('/auth/login', {
+        matricula,
+        senha
+      });
+
+      const { token, usuario } = response.data || {};
+
+      if (!token || !usuario) {
+        throw new Error('Resposta de autenticação inválida.');
+      }
+
+      localStorage.setItem(TOKEN_KEY, token);
+      localStorage.setItem(USER_KEY, JSON.stringify(usuario));
+
+      return response.data;
+    } catch (error) {
+      this.logout();
+      throw error;
     }
-    return response.data;
   },
 
   async getProfile() {
@@ -16,16 +34,27 @@ export const authService = {
   },
 
   logout() {
-    localStorage.removeItem('farmatech_token');
-    localStorage.removeItem('farmatech_user');
+    localStorage.removeItem(TOKEN_KEY);
+    localStorage.removeItem(USER_KEY);
   },
 
   getCurrentUser() {
-    const userStr = localStorage.getItem('farmatech_user');
-    return userStr ? JSON.parse(userStr) : null;
+    const userStr = localStorage.getItem(USER_KEY);
+
+    if (!userStr) {
+      return null;
+    }
+
+    try {
+      return JSON.parse(userStr);
+    } catch {
+      localStorage.removeItem(USER_KEY);
+      localStorage.removeItem(TOKEN_KEY);
+      return null;
+    }
   },
 
   isAuthenticated() {
-    return !!localStorage.getItem('farmatech_token');
+    return !!localStorage.getItem(TOKEN_KEY);
   }
 };

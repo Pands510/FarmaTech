@@ -1,13 +1,16 @@
+
 import api from './api';
 
-export const cashierService = {
+const cashierService = {
   async getStatus() {
     const response = await api.get('/caixa/status-atual');
     return response.data;
   },
 
   async openCaixa(valorAbertura) {
-    const response = await api.post('/caixa/abrir', { valor_abertura: valorAbertura });
+    const response = await api.post('/caixa/abrir', {
+      valor_abertura: valorAbertura
+    });
     return response.data;
   },
 
@@ -29,3 +32,5 @@ export const cashierService = {
     return response.data;
   }
 };
+
+export default cashierService;

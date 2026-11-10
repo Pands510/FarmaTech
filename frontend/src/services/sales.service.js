@@ -1,8 +1,8 @@
+
 import api from './api';
 
-export const salesService = {
+const salesService = {
   async checkout(payload) {
-    // payload: { id_caixa, id_cliente, itens: [...], pagamentos: [...], desconto_valor }
     const response = await api.post('/vendas/checkout', payload);
     return response.data;
   },
@@ -18,7 +18,9 @@ export const salesService = {
   },
 
   async searchCustomers(busca) {
-    const response = await api.get('/vendas/clientes', { params: { busca } });
+    const response = await api.get('/vendas/clientes', {
+      params: { busca }
+    });
     return response.data;
   },
 
@@ -27,3 +29,5 @@ export const salesService = {
     return response.data;
   }
 };
+
+export default salesService;

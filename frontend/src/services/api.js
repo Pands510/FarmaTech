@@ -1,3 +1,4 @@
+
 import axios from 'axios';
 
 const api = axios.create({
@@ -8,38 +9,52 @@ const api = axios.create({
   }
 });
 
-// Interceptor de Requisição: Injeta o token JWT do localStorage se existir
+// Interceptor de Requisição: Injeta o token JWT do localStorage se existir.
 api.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem('farmatech_token');
+
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
+
     return config;
   },
   (error) => Promise.reject(error)
 );
 
-// Interceptor de Resposta: Padroniza o tratamento de erros
+// Interceptor de Resposta: Padroniza o tratamento de erros.
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    // Se a sessão expirou (401), limpa credenciais e redireciona para login se necessário
-    if (error.response && error.response.status === 401) {
+    const status = error.response?.status;
+    const requestUrl = error.config?.url || '';
+
+    // Identifica se a requisição corresponde ao endpoint de login.
+    const isLoginRequest = /\/auth\/login(?:[?#]|$)/.test(requestUrl);
+
+    // Trata sessões expiradas ou tokens inválidos.
+    if (status === 401 && !isLoginRequest) {
+      localStorage.removeItem('farmatech_token');
+      localStorage.removeItem('farmatech_user');
+
+      // Redireciona somente se o usuário ainda não estiver no login.
       if (window.location.pathname !== '/login') {
-        localStorage.removeItem('farmatech_token');
-        localStorage.removeItem('farmatech_user');
+        window.location.assign('/login');
       }
     }
 
-    const customMessage = error.response?.data?.message || 'Erro ao comunicar com o servidor.';
-    const customCode = error.response?.data?.code || 'SERVER_ERROR';
+    // Preserva o erro original do Axios e acrescenta informações
+    // que podem ser utilizadas pelos componentes da interface.
+    error.userMessage =
+      error.response?.data?.message ||
+      'Erro ao comunicar com o servidor.';
 
-    return Promise.reject({
-      ...error,
-      userMessage: customMessage,
-      code: customCode
-    });
+    error.apiCode =
+      error.response?.data?.code ||
+      'SERVER_ERROR';
+
+    return Promise.reject(error);
   }
 );
 

@@ -1,5 +1,7 @@
+
 const express = require('express');
 const router = express.Router();
+
 const productsController = require('./products.controller');
 const authMiddleware = require('../../middlewares/auth.middleware');
 const { authorize } = require('../../middlewares/permission.middleware');
@@ -10,7 +12,7 @@ router.use(authMiddleware);
  * @swagger
  * /api/produtos:
  *   get:
- *     summary: Lista produtos do catálogo com saldo vendável calculado via fn_estoque_disponivel
+ *     summary: Lista produtos do catálogo com saldo disponível
  *     tags: [Produtos]
  *     security:
  *       - bearerAuth: []
@@ -24,6 +26,7 @@ router.use(authMiddleware);
  *         name: id_grupo
  *         schema:
  *           type: integer
+ *           minimum: 1
  *       - in: query
  *         name: status
  *         schema:
@@ -35,7 +38,9 @@ router.use(authMiddleware);
  *           type: boolean
  *     responses:
  *       200:
- *         description: Catálogo de produtos retornado com sucesso
+ *         description: Catálogo retornado com sucesso
+ *       401:
+ *         description: Não autenticado
  */
 router.get('/', productsController.list);
 
@@ -43,7 +48,7 @@ router.get('/', productsController.list);
  * @swagger
  * /api/produtos/categorias:
  *   get:
- *     summary: Retorna a árvore de grupos e subgrupos farmacêuticos
+ *     summary: Retorna grupos e subgrupos farmacêuticos
  *     tags: [Produtos]
  *     security:
  *       - bearerAuth: []
@@ -57,7 +62,7 @@ router.get('/categorias', productsController.getCategories);
  * @swagger
  * /api/produtos/{id}:
  *   get:
- *     summary: Retorna a ficha técnica detalhada de um produto
+ *     summary: Retorna a ficha técnica de um produto
  *     tags: [Produtos]
  *     security:
  *       - bearerAuth: []
@@ -67,6 +72,7 @@ router.get('/categorias', productsController.getCategories);
  *         required: true
  *         schema:
  *           type: integer
+ *           minimum: 1
  *     responses:
  *       200:
  *         description: Produto encontrado
@@ -79,7 +85,7 @@ router.get('/:id', productsController.getById);
  * @swagger
  * /api/produtos/{id}/lotes-fifo:
  *   get:
- *     summary: Retorna os lotes ativos do produto ordenados por validade (Curva FIFO para PDV)
+ *     summary: Retorna lotes disponíveis ordenados por validade (FEFO)
  *     tags: [Produtos]
  *     security:
  *       - bearerAuth: []
@@ -89,9 +95,12 @@ router.get('/:id', productsController.getById);
  *         required: true
  *         schema:
  *           type: integer
+ *           minimum: 1
  *     responses:
  *       200:
- *         description: Lotes ordenados para prioridade de saída
+ *         description: Lotes disponíveis retornados com sucesso
+ *       404:
+ *         description: Produto não localizado
  */
 router.get('/:id/lotes-fifo', productsController.getLotesFifo);
 
@@ -99,21 +108,29 @@ router.get('/:id/lotes-fifo', productsController.getLotesFifo);
  * @swagger
  * /api/produtos:
  *   post:
- *     summary: Cadastra um novo produto na ficha técnica (Gerente ou Estoquista)
+ *     summary: Cadastra um novo produto
  *     tags: [Produtos]
  *     security:
  *       - bearerAuth: []
  *     responses:
  *       201:
  *         description: Produto cadastrado com sucesso
+ *       400:
+ *         description: Dados inválidos
+ *       403:
+ *         description: Permissão insuficiente
  */
-router.post('/', authorize(['GERENTE', 'ESTOQUISTA']), productsController.create);
+router.post(
+  '/',
+  authorize(['GERENTE', 'ESTOQUISTA']),
+  productsController.create
+);
 
 /**
  * @swagger
  * /api/produtos/{id}:
  *   put:
- *     summary: Atualiza os dados de um produto (dispara trigger de auditoria trg_log_preco_produto se alterar preço)
+ *     summary: Atualiza os dados de um produto
  *     tags: [Produtos]
  *     security:
  *       - bearerAuth: []
@@ -123,17 +140,27 @@ router.post('/', authorize(['GERENTE', 'ESTOQUISTA']), productsController.create
  *         required: true
  *         schema:
  *           type: integer
+ *           minimum: 1
  *     responses:
  *       200:
  *         description: Produto atualizado com sucesso
+ *       400:
+ *         description: Dados inválidos
+ *       404:
+ *         description: Produto não localizado
  */
-router.put('/:id', authorize(['GERENTE', 'ESTOQUISTA']), productsController.update);
+router.put(
+  '/:id',
+  authorize(['GERENTE', 'ESTOQUISTA']),
+  productsController.update
+);
 
 /**
  * @swagger
  * /api/produtos/{id}/inativar:
  *   patch:
- *     summary: Inativação lógica do produto (preserva histórico e auditoria)
+ *     summary: Realiza a inativação lógica de um produto
+ *     description: Preserva o histórico de movimentações e auditoria.
  *     tags: [Produtos]
  *     security:
  *       - bearerAuth: []
@@ -143,11 +170,19 @@ router.put('/:id', authorize(['GERENTE', 'ESTOQUISTA']), productsController.upda
  *         required: true
  *         schema:
  *           type: integer
+ *           minimum: 1
  *     responses:
  *       200:
  *         description: Produto inativado
+ *       404:
+ *         description: Produto não localizado
+ *       403:
+ *         description: Permissão insuficiente
  */
-router.patch('/:id/inativar', authorize(['GERENTE']), productsController.inactivate);
-router.delete('/:id', authorize(['GERENTE']), productsController.inactivate);
+router.patch(
+  '/:id/inativar',
+  authorize(['GERENTE']),
+  productsController.inactivate
+);
 
 module.exports = router;

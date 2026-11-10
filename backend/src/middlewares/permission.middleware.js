@@ -1,7 +1,11 @@
+
 /**
  * Middleware para controle de acesso baseado em papéis (RBAC).
- * Exemplo de uso: authorize(['ADMINISTRADOR', 'GERENTE', 'FARMACEUTICO'])
+ *
+ * Exemplo:
+ * authorize(['ADMINISTRADOR', 'GERENTE', 'FARMACEUTICO'])
  */
+
 function authorize(allowedRoles = []) {
   return (req, res, next) => {
     if (!req.user) {
@@ -12,24 +16,35 @@ function authorize(allowedRoles = []) {
       });
     }
 
-    const userCargo = (req.user.cargo || '').toUpperCase();
-    const userPerfil = (req.user.perfil || '').toUpperCase();
-
-    // Administradores e gerentes têm acesso geral por padrão
-    if (userCargo === 'ADMINISTRADOR' || userPerfil === 'CEO' || userPerfil === 'DBA') {
-      return next();
+    if (!Array.isArray(allowedRoles)) {
+      return res.status(500).json({
+        error: true,
+        code: 'AUTHORIZATION_CONFIGURATION_ERROR',
+        message: 'Configuração de papéis inválida.'
+      });
     }
 
-    const normalizedAllowed = allowedRoles.map(r => r.toUpperCase());
+    const userPerfil = String(req.user.perfil || '')
+      .trim()
+      .toUpperCase();
 
-    const hasCargoPermission = normalizedAllowed.includes(userCargo);
-    const hasPerfilPermission = normalizedAllowed.includes(userPerfil);
+    const normalizedAllowed = allowedRoles.map(role =>
+      String(role).trim().toUpperCase()
+    );
 
-    if (!hasCargoPermission && !hasPerfilPermission) {
+    if (!userPerfil) {
+      return res.status(403).json({
+        error: true,
+        code: 'PROFILE_NOT_DEFINED',
+        message: 'Usuário sem perfil de acesso definido.'
+      });
+    }
+
+    if (!normalizedAllowed.includes(userPerfil)) {
       return res.status(403).json({
         error: true,
         code: 'FORBIDDEN',
-        message: `Acesso negado. Esta operação exige perfil/cargo: [${allowedRoles.join(', ')}]. Seu cargo atual: ${req.user.cargo || 'Não definido'}.`
+        message: `Acesso negado. Esta operação exige um dos seguintes perfis: [${allowedRoles.join(', ')}].`
       });
     }
 

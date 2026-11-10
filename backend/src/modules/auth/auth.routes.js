@@ -1,5 +1,7 @@
+
 const express = require('express');
 const router = express.Router();
+
 const authController = require('./auth.controller');
 const authMiddleware = require('../../middlewares/auth.middleware');
 
@@ -15,19 +17,28 @@ const authMiddleware = require('../../middlewares/auth.middleware');
  *         application/json:
  *           schema:
  *             type: object
- *             required: [matricula, senha]
+ *             required:
+ *               - matricula
+ *               - senha
  *             properties:
  *               matricula:
  *                 type: string
  *                 example: MAT001
  *               senha:
  *                 type: string
- *                 example: senha123
+ *                 format: password
+ *                 example: senha-ficticia
  *     responses:
  *       200:
- *         description: Login realizado com sucesso e emissão de token JWT
+ *         description: Login realizado com sucesso
+ *       400:
+ *         description: Dados obrigatórios ausentes ou inválidos
  *       401:
  *         description: Credenciais inválidas
+ *       403:
+ *         description: Funcionário inativo
+ *       500:
+ *         description: Erro interno ou de configuração
  */
 router.post('/login', authController.login);
 
@@ -41,9 +52,13 @@ router.post('/login', authController.login);
  *       - bearerAuth: []
  *     responses:
  *       200:
- *         description: Perfil do usuário logado
+ *         description: Perfil do usuário autenticado
  *       401:
- *         description: Não autenticado
+ *         description: Token ausente, inválido ou expirado
+ *       403:
+ *         description: Funcionário inativo
+ *       404:
+ *         description: Funcionário não localizado
  */
 router.get('/me', authMiddleware, authController.me);
 

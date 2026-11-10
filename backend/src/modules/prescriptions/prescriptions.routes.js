@@ -1,5 +1,7 @@
+
 const express = require('express');
 const router = express.Router();
+
 const prescriptionsController = require('./prescriptions.controller');
 const authMiddleware = require('../../middlewares/auth.middleware');
 const { authorize } = require('../../middlewares/permission.middleware');
@@ -10,15 +12,23 @@ router.use(authMiddleware);
  * @swagger
  * /api/receitas/pendentes:
  *   get:
- *     summary: Lista receitas ativas e pendências para validação do farmacêutico
+ *     summary: Lista receitas válidas cadastradas recentemente
  *     tags: [Receituário Farmacêutico]
  *     security:
  *       - bearerAuth: []
  *     responses:
  *       200:
  *         description: Fila de receitas
+ *       401:
+ *         description: Não autenticado
+ *       403:
+ *         description: Permissão insuficiente
  */
-router.get('/pendentes', authorize(['FARMACEUTICO', 'GERENTE']), prescriptionsController.getPending);
+router.get(
+  '/pendentes',
+  authorize(['FARMACEUTICO', 'GERENTE']),
+  prescriptionsController.getPending
+);
 
 /**
  * @swagger
@@ -33,13 +43,25 @@ router.get('/pendentes', authorize(['FARMACEUTICO', 'GERENTE']), prescriptionsCo
  *         name: id_cliente
  *         schema:
  *           type: integer
+ *           minimum: 1
  *       - in: query
  *         name: apenas_validas
  *         schema:
  *           type: boolean
+ *       - in: query
+ *         name: limite
+ *         schema:
+ *           type: integer
+ *           minimum: 1
+ *           maximum: 500
+ *           default: 50
  *     responses:
  *       200:
  *         description: Lista de receitas
+ *       400:
+ *         description: Parâmetros inválidos
+ *       401:
+ *         description: Não autenticado
  */
 router.get('/', prescriptionsController.list);
 
@@ -57,9 +79,14 @@ router.get('/', prescriptionsController.list);
  *         required: true
  *         schema:
  *           type: integer
+ *           minimum: 1
  *     responses:
  *       200:
  *         description: Detalhes da receita
+ *       400:
+ *         description: Identificador inválido
+ *       404:
+ *         description: Receita não encontrada
  */
 router.get('/:id', prescriptionsController.getById);
 
@@ -67,7 +94,7 @@ router.get('/:id', prescriptionsController.getById);
  * @swagger
  * /api/receitas:
  *   post:
- *     summary: Cadastra receita médica vinculando paciente, médico e medicamentos
+ *     summary: Cadastra receita médica
  *     tags: [Receituário Farmacêutico]
  *     security:
  *       - bearerAuth: []
@@ -77,10 +104,16 @@ router.get('/:id', prescriptionsController.getById);
  *         application/json:
  *           schema:
  *             type: object
- *             required: [id_cliente, nome_prescritor, crm_prescritor, data_prescricao, validade_receita]
+ *             required:
+ *               - id_cliente
+ *               - nome_prescritor
+ *               - crm_prescritor
+ *               - data_prescricao
+ *               - validade_receita
  *             properties:
  *               id_cliente:
  *                 type: integer
+ *                 minimum: 1
  *               id_medico:
  *                 type: integer
  *                 nullable: true
@@ -100,24 +133,37 @@ router.get('/:id', prescriptionsController.getById);
  *                 type: array
  *                 items:
  *                   type: object
+ *                   required: [id_produto, quantidade]
  *                   properties:
  *                     id_produto:
  *                       type: integer
+ *                       minimum: 1
  *                     quantidade:
  *                       type: integer
+ *                       minimum: 1
  *                     posologia:
  *                       type: string
  *     responses:
  *       201:
  *         description: Receita cadastrada
+ *       400:
+ *         description: Dados inválidos
+ *       401:
+ *         description: Não autenticado
+ *       403:
+ *         description: Permissão insuficiente
  */
-router.post('/', authorize(['FARMACEUTICO', 'GERENTE', 'ATENDENTE']), prescriptionsController.create);
+router.post(
+  '/',
+  authorize(['FARMACEUTICO', 'GERENTE', 'ATENDENTE']),
+  prescriptionsController.create
+);
 
 /**
  * @swagger
  * /api/receitas/{id}/aprovar:
  *   post:
- *     summary: Farmacêutico aprova a receita liberando para venda no PDV
+ *     summary: Aprova receita para utilização no PDV
  *     tags: [Receituário Farmacêutico]
  *     security:
  *       - bearerAuth: []
@@ -127,11 +173,22 @@ router.post('/', authorize(['FARMACEUTICO', 'GERENTE', 'ATENDENTE']), prescripti
  *         required: true
  *         schema:
  *           type: integer
+ *           minimum: 1
  *     responses:
  *       200:
  *         description: Receita aprovada
+ *       400:
+ *         description: Receita inválida para aprovação
+ *       403:
+ *         description: Permissão insuficiente
+ *       404:
+ *         description: Receita não encontrada
  */
-router.post('/:id/aprovar', authorize(['FARMACEUTICO', 'GERENTE']), prescriptionsController.approve);
+router.post(
+  '/:id/aprovar',
+  authorize(['FARMACEUTICO', 'GERENTE']),
+  prescriptionsController.approve
+);
 
 /**
  * @swagger
@@ -151,9 +208,13 @@ router.post('/:id/aprovar', authorize(['FARMACEUTICO', 'GERENTE']), prescription
  *         name: uf
  *         schema:
  *           type: string
+ *           minLength: 2
+ *           maxLength: 2
  *     responses:
  *       200:
  *         description: Médicos localizados
+ *       400:
+ *         description: Parâmetros inválidos
  */
 router.get('/medicos/busca', prescriptionsController.searchDoctors);
 
@@ -161,7 +222,7 @@ router.get('/medicos/busca', prescriptionsController.searchDoctors);
  * @swagger
  * /api/medicos:
  *   post:
- *     summary: Cadastra um novo médico prescritor
+ *     summary: Cadastra médico prescritor
  *     tags: [Médicos / Prescritores]
  *     security:
  *       - bearerAuth: []
@@ -179,13 +240,22 @@ router.get('/medicos/busca', prescriptionsController.searchDoctors);
  *                 type: string
  *               uf_crm:
  *                 type: string
- *                 example: SP
+ *                 minLength: 2
+ *                 maxLength: 2
  *               especialidade:
  *                 type: string
  *     responses:
  *       201:
  *         description: Médico cadastrado
+ *       400:
+ *         description: Dados inválidos
+ *       403:
+ *         description: Permissão insuficiente
  */
-router.post('/medicos', authorize(['FARMACEUTICO', 'GERENTE', 'ATENDENTE']), prescriptionsController.createDoctor);
+router.post(
+  '/medicos',
+  authorize(['FARMACEUTICO', 'GERENTE', 'ATENDENTE']),
+  prescriptionsController.createDoctor
+);
 
 module.exports = router;

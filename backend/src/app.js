@@ -95,12 +95,14 @@ const swaggerOptions = {
     }
   },
   apis: [
-    path.join(__dirname, 'modules/**/*.routes.js'),
-    path.join(__dirname, 'routes/*.js')
+    './src/modules/**/*.routes.js',
+    './src/routes/*.js'
   ]
 };
 
 const swaggerSpec = swaggerJsdoc(swaggerOptions);
+console.log('[Swagger] Arquivos configurados:', swaggerOptions.apis);
+console.log('[Swagger] Caminhos encontrados:', Object.keys(swaggerSpec.paths || {}));
 
 // Documentação Swagger
 // Política específica para os recursos da interface Swagger.

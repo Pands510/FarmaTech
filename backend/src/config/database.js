@@ -2,6 +2,12 @@
 const mysql = require('mysql2/promise');
 require('dotenv').config();
 
+console.log('[ENV] Arquivo .env carregado:', !!process.env.DB_HOST);
+console.log('[ENV] DB_USER:', process.env.DB_USER);
+console.log('[ENV] DB_NAME:', process.env.DB_NAME);
+console.log('[ENV] DB_PASSWORD definida:', !!process.env.DB_PASSWORD);
+console.log('[ENV] NODE_ENV:', process.env.NODE_ENV);
+
 const isProduction = process.env.NODE_ENV === 'production';
 
 const requiredVariables = [
